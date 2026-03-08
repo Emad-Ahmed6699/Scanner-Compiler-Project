@@ -1,0 +1,17 @@
+# GoalLang Program Example
+# Example of GoalLang code
+
+#import arena
+
+score kickoff:
+    player name
+    score goals
+    
+    shout "Enter player name: "
+    receive name
+    
+    shout "Enter goals: "
+    receive goals
+    
+    shout name + " scored " + goals + " goals!"
+    goal 0
