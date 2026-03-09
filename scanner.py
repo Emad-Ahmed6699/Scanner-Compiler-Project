@@ -5,7 +5,7 @@ import re
 # ============================================================
 TOKEN_PATTERNS = {
     'COMMENT':      r'#[^\n]*',
-    'STRING':       r'(["\'])([^\\]\1|\\.|[^\1\\])*?\1',
+    'STRING':       r'"[^"]*"',
     'BOOLEAN':      r'\b(true|false)\b',
     'NUMBER':       r'\d+(?:\.\d+)?',
     'RESERVED':     r'\b(kickoff|shout|receive|referee|offside|training|match|goal|import|stadium|range|in)\b',
