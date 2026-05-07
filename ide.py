@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
+import customtkinter as ctk
 import sys
 import io
 import threading
@@ -13,19 +14,23 @@ from parser import Parser
 from analyzer import SemanticAnalyzer
 from generator import CodeGenerator
 
+# Set appearance and theme
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
+
 class ASTVisualizer:
     """Custom class to draw the AST graphically on a Canvas"""
     def __init__(self, canvas):
         self.canvas = canvas
-        self.node_radius = 18
-        self.v_spacing = 60
+        self.node_radius = 22
+        self.v_spacing = 70
         self.colors = {
-            "Control": "#d13438",
-            "Statement": "#007acc",
-            "Literal": "#28a745",
-            "Variable": "#ce9178",
-            "Function": "#c586c0",
-            "Default": "#333333"
+            "Control": "#f43f5e",    # Rose 500
+            "Statement": "#3b82f6",  # Blue 500
+            "Literal": "#10b981",    # Emerald 500
+            "Variable": "#f59e0b",   # Amber 500
+            "Function": "#8b5cf6",   # Violet 500
+            "Default": "#475569"     # Slate 600
         }
 
     def get_node_color(self, name):
@@ -38,7 +43,7 @@ class ASTVisualizer:
     def draw(self, node):
         self.canvas.delete("all")
         if not node: return
-        self._draw_node(node, 1000, 40, 300)
+        self._draw_node(node, 1000, 50, 350)
         self.canvas.config(scrollregion=self.canvas.bbox("all"))
 
     def _draw_node(self, node, x, y, x_offset):
@@ -51,11 +56,16 @@ class ASTVisualizer:
             for i, child in enumerate(children):
                 child_x = start_x + (i * x_offset)
                 child_y = y + self.v_spacing
-                self.canvas.create_line(x, y, child_x, child_y, fill="#444444", width=1)
-                self._draw_node(child, child_x, child_y, max(x_offset / 1.9, 40))
-        self.canvas.create_oval(x-self.node_radius, y-self.node_radius, x+self.node_radius, y+self.node_radius, fill=color, outline="#ffffff", width=1)
+                self.canvas.create_line(x, y, child_x, child_y, fill="#334155", width=2, smooth=True)
+                self._draw_node(child, child_x, child_y, max(x_offset / 1.8, 50))
+        
+        # Draw node shadow
+        self.canvas.create_oval(x-self.node_radius+2, y-self.node_radius+2, x+self.node_radius+2, y+self.node_radius+2, fill="#000000", outline="", stipple="gray50")
+        # Draw node
+        self.canvas.create_oval(x-self.node_radius, y-self.node_radius, x+self.node_radius, y+self.node_radius, fill=color, outline="#ffffff", width=2)
+        
         clean_name = name.split('(')[0]
-        self.canvas.create_text(x, y, text=clean_name, fill="white", font=("Segoe UI", 7, "bold"))
+        self.canvas.create_text(x, y, text=clean_name, fill="white", font=("Segoe UI", 8, "bold"))
 
 class CustomText(tk.Text):
     def __init__(self, *args, **kwargs):
@@ -84,87 +94,189 @@ class LineNumbers(tk.Canvas):
             if dline is None: break
             y = dline[1]
             linenum = str(i).split(".")[0]
-            self.create_text(18, y, anchor="n", text=linenum, fill="#858585", font=("Consolas", 10))
+            self.create_text(18, y, anchor="n", text=linenum, fill="#4b5563", font=("JetBrains Mono", 10))
             i = self.textwidget.index("%s+1line" % i)
 
-class GoalIDE:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("⚽ GoalLang-IDE - Pro Compiler")
-        self.root.geometry("1400x900")
-        self.root.configure(bg="#1e1e1e")
-        self.setup_styles()
+class GoalIDE(ctk.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("⚽ GoalLang IDE - Pro Edition")
+        self.geometry("1400x900")
+        self.configure(fg_color="#0f172a") # Slate 950
+        
+        # Window icon/scaling
+        try: self.after(0, lambda: self.state('zoomed'))
+        except: pass
+        
         self.setup_menubar()
         self.setup_ui()
         self.setup_syntax_highlighting()
+        
         self.editor.bind("<<Change>>", self.on_content_change)
         self.editor.bind("<Return>", self.handle_auto_indent)
         self.editor.bind("<Key>", self.clear_error_highlight)
 
-    def setup_styles(self):
-        style = ttk.Style(); style.theme_use("clam")
-        style.configure("TNotebook", background="#2d2d2d", borderwidth=0)
-        style.configure("TNotebook.Tab", background="#333333", foreground="#d4d4d4", padding=[12, 4])
-        style.map("TNotebook.Tab", background=[("selected", "#1e1e1e")], foreground=[("selected", "#007acc")])
-        style.configure("Treeview", background="#252526", foreground="white", fieldbackground="#252526", borderwidth=0)
-        style.configure("Treeview.Heading", background="#333333", foreground="white", font=("Segoe UI", 9, "bold"))
-
     def setup_menubar(self):
-        menubar = tk.Menu(self.root, bg="#333333", fg="white")
-        file_menu = tk.Menu(menubar, tearoff=0, bg="#333333", fg="white")
+        menubar = tk.Menu(self, bg="#1e293b", fg="white", activebackground="#3b82f6", borderwidth=0)
+        file_menu = tk.Menu(menubar, tearoff=0, bg="#1e293b", fg="white", activebackground="#3b82f6")
         file_menu.add_command(label="New File", command=self.new_file)
         file_menu.add_command(label="Open...", command=self.open_file)
         file_menu.add_command(label="Save", command=self.save_file)
         file_menu.add_separator()
         file_menu.add_command(label="Export Python", command=self.export_python)
         menubar.add_cascade(label="File", menu=file_menu)
-        self.root.config(menu=menubar)
+        self.config(menu=menubar)
 
     def setup_ui(self):
-        toolbar = tk.Frame(self.root, bg="#2d2d2d", height=45)
-        toolbar.pack(side=tk.TOP, fill=tk.X)
-        self.btn_run = tk.Button(toolbar, text=" ▶ RUN COMPILER ", command=self.run_code, bg="#28a745", fg="white", font=("Segoe UI", 10, "bold"), relief="flat", padx=15)
-        self.btn_run.pack(side=tk.LEFT, padx=10, pady=5)
-        tk.Button(toolbar, text=" 💾 EXPORT PY ", command=self.export_python, bg="#007acc", fg="white", font=("Segoe UI", 9, "bold"), relief="flat", padx=10).pack(side=tk.LEFT, padx=5, pady=5)
-        self.main_pane = tk.PanedWindow(self.root, orient=tk.HORIZONTAL, bg="#2d2d2d", sashwidth=4)
-        self.main_pane.pack(fill=tk.BOTH, expand=True)
-        ed_cont = tk.Frame(self.main_pane, bg="#1e1e1e"); self.main_pane.add(ed_cont, width=650)
-        tk.Label(ed_cont, text=" ⚽ GOALLANG SOURCE", bg="#2d2d2d", fg="#007acc", font=("Segoe UI", 10, "bold"), pady=5).pack(fill=tk.X)
-        ed_sub = tk.Frame(ed_cont, bg="#1e1e1e"); ed_sub.pack(fill=tk.BOTH, expand=True)
-        self.line_nums = LineNumbers(ed_sub, width=35, bg="#1e1e1e", highlightthickness=0); self.line_nums.pack(side=tk.LEFT, fill=tk.Y)
-        self.editor = CustomText(ed_sub, bg="#1e1e1e", fg="#d4d4d4", insertbackground="white", font=("Consolas", 13), undo=True, borderwidth=0, wrap="none")
-        self.editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True); self.line_nums.textwidget = self.editor
-        self.tabs = ttk.Notebook(self.main_pane); self.main_pane.add(self.tabs)
-        self.console = tk.Text(self.tabs, bg="#000000", fg="#ffffff", font=("Consolas", 11), borderwidth=0); self.tabs.add(self.console, text=" 💻 TERMINAL ")
-        self.py_view = tk.Text(self.tabs, bg="#1e1e1e", fg="#80cbc4", font=("Consolas", 11), state="disabled", borderwidth=0); self.tabs.add(self.py_view, text=" 🐍 PYTHON ")
-        tk_fr = tk.Frame(self.tabs); self.tabs.add(tk_fr, text=" 🔍 TOKENS ")
-        self.token_tree = ttk.Treeview(tk_fr, columns=("T", "V", "L"), show="headings")
-        for c, h in zip(("T", "V", "L"), ("Type", "Value", "Line")): self.token_tree.heading(c, text=h)
-        self.token_tree.pack(fill=tk.BOTH, expand=True)
-        sym_fr = tk.Frame(self.tabs); self.tabs.add(sym_fr, text=" 📊 SYMBOLS ")
-        self.sym_tree = ttk.Treeview(sym_fr, columns=("N", "T", "S", "L"), show="headings")
-        for c, h in zip(("N", "T", "S", "L"), ("Name", "Type", "Scope", "Line")): self.sym_tree.heading(c, text=h)
-        self.sym_tree.pack(fill=tk.BOTH, expand=True)
-        ast_fr = tk.Frame(self.tabs, bg="#1e1e1e"); self.tabs.add(ast_fr, text=" 🌳 PARSER TREE ")
-        sx = tk.Scrollbar(ast_fr, orient=tk.HORIZONTAL); sx.pack(side=tk.BOTTOM, fill=tk.X)
-        sy = tk.Scrollbar(ast_fr, orient=tk.VERTICAL); sy.pack(side=tk.RIGHT, fill=tk.Y)
-        self.ast_canvas = tk.Canvas(ast_fr, bg="#1e1e1e", highlightthickness=0, xscrollcommand=sx.set, yscrollcommand=sy.set); self.ast_canvas.pack(fill=tk.BOTH, expand=True)
-        sx.config(command=self.ast_canvas.xview); sy.config(command=self.ast_canvas.yview); self.visualizer = ASTVisualizer(self.ast_canvas)
+        # Header / Toolbar
+        self.header = ctk.CTkFrame(self, height=60, corner_radius=0, fg_color="#1e293b", border_width=1, border_color="#334155")
+        self.header.pack(side=tk.TOP, fill=tk.X)
+        
+        title_lbl = ctk.CTkLabel(self.header, text="⚽ GOALLANG COMPILER", font=("Segoe UI", 16, "bold"), text_color="#3b82f6")
+        title_lbl.pack(side=tk.LEFT, padx=20)
+        
+        self.btn_run = ctk.CTkButton(self.header, text="▶  RUN COMPILER", command=self.run_code, 
+                                    fg_color="#10b981", hover_color="#059669", font=("Segoe UI", 13, "bold"), 
+                                    width=160, height=35, corner_radius=8)
+        self.btn_run.pack(side=tk.LEFT, padx=15, pady=12)
+        
+        self.btn_export = ctk.CTkButton(self.header, text="💾  EXPORT PY", command=self.export_python, 
+                                       fg_color="#3b82f6", hover_color="#2563eb", font=("Segoe UI", 12, "bold"), 
+                                       width=130, height=35, corner_radius=8)
+        self.btn_export.pack(side=tk.LEFT, padx=5, pady=12)
+
+        # Main Layout (Sidebar + Editor + Tabs)
+        self.main_container = ctk.CTkFrame(self, fg_color="transparent")
+        self.main_container.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Paned Window for flexibility
+        self.paned = tk.PanedWindow(self.main_container, orient=tk.HORIZONTAL, bg="#0f172a", sashwidth=4, borderwidth=0)
+        self.paned.pack(fill=tk.BOTH, expand=True)
+
+        # Editor Section
+        self.ed_frame = ctk.CTkFrame(self.paned, fg_color="#1e293b", corner_radius=12, border_width=1, border_color="#334155")
+        self.paned.add(self.ed_frame, width=700)
+        
+        ed_title_bar = ctk.CTkFrame(self.ed_frame, height=35, fg_color="#334155", corner_radius=0)
+        ed_title_bar.pack(fill=tk.X)
+        ctk.CTkLabel(ed_title_bar, text="📄 SOURCE CODE", font=("Segoe UI", 11, "bold"), text_color="#e2e8f0").pack(side=tk.LEFT, padx=15)
+        
+        ed_content = ctk.CTkFrame(self.ed_frame, fg_color="transparent")
+        ed_content.pack(fill=tk.BOTH, expand=True, padx=2, pady=2)
+        
+        self.line_nums = LineNumbers(ed_content, width=40, bg="#1e293b", highlightthickness=0)
+        self.line_nums.pack(side=tk.LEFT, fill=tk.Y, pady=10)
+        
+        self.editor = CustomText(ed_content, bg="#1e293b", fg="#e2e8f0", insertbackground="white", 
+                                font=("Consolas", 14), undo=True, borderwidth=0, wrap="none",
+                                padx=10, pady=10, selectbackground="#3b82f6")
+        self.editor.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.line_nums.textwidget = self.editor
+
+        # Output Section (Tabs)
+        self.out_frame = ctk.CTkFrame(self.paned, fg_color="transparent")
+        self.paned.add(self.out_frame)
+        
+        self.tabs = ctk.CTkTabview(self.out_frame, fg_color="#1e293b", segmented_button_selected_color="#3b82f6",
+                                  segmented_button_unselected_hover_color="#334155", corner_radius=12,
+                                  border_width=1, border_color="#334155")
+        self.tabs.pack(fill=tk.BOTH, expand=True)
+        
+        tab_list = ["💻 TERMINAL", "🐍 PYTHON", "🔍 TOKENS", "📊 SYMBOLS", "🌳 PARSER TREE"]
+        for t in tab_list: self.tabs.add(t)
+        
+        # Terminal Tab
+        self.console = tk.Text(self.tabs.tab("💻 TERMINAL"), bg="#020617", fg="#ffffff", font=("Consolas", 11), 
+                              borderwidth=0, padx=15, pady=15)
+        self.console.pack(fill=tk.BOTH, expand=True)
+        
+        # Python Tab
+        self.py_view = tk.Text(self.tabs.tab("🐍 PYTHON"), bg="#020617", fg="#80cbc4", font=("Consolas", 11), 
+                              state="disabled", borderwidth=0, padx=15, pady=15)
+        self.py_view.pack(fill=tk.BOTH, expand=True)
+        
+        # Tokens Tab
+        self.setup_treeview(self.tabs.tab("🔍 TOKENS"), ("Type", "Value", "Line"), "token_tree")
+        
+        # Symbols Tab
+        self.setup_treeview(self.tabs.tab("📊 SYMBOLS"), ("Name", "Type", "Scope", "Line"), "sym_tree")
+        
+        # AST Tab
+        ast_cont = ctk.CTkFrame(self.tabs.tab("🌳 PARSER TREE"), fg_color="#0f172a")
+        ast_cont.pack(fill=tk.BOTH, expand=True)
+        
+        # Horizontal Scrollbar
+        self.ast_xscroll = ctk.CTkScrollbar(ast_cont, orientation="horizontal")
+        self.ast_xscroll.pack(side=tk.BOTTOM, fill=tk.X)
+        
+        # Vertical Scrollbar
+        self.ast_yscroll = ctk.CTkScrollbar(ast_cont, orientation="vertical")
+        self.ast_yscroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.ast_canvas = tk.Canvas(ast_cont, bg="#0f172a", highlightthickness=0,
+                                   xscrollcommand=self.ast_xscroll.set,
+                                   yscrollcommand=self.ast_yscroll.set)
+        self.ast_canvas.pack(fill=tk.BOTH, expand=True)
+        
+        self.ast_xscroll.configure(command=self.ast_canvas.xview)
+        self.ast_yscroll.configure(command=self.ast_canvas.yview)
+        
+        # Mouse wheel support for AST
+        self.ast_canvas.bind("<MouseWheel>", lambda e: self.ast_canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        self.ast_canvas.bind("<Shift-MouseWheel>", lambda e: self.ast_canvas.xview_scroll(int(-1*(e.delta/120)), "units"))
+        
+        # Drag to pan support
+        self.ast_canvas.bind("<ButtonPress-1>", lambda e: self.ast_canvas.scan_mark(e.x, e.y))
+        self.ast_canvas.bind("<B1-Motion>", lambda e: self.ast_canvas.scan_dragto(e.x, e.y, gain=1))
+        
+        self.visualizer = ASTVisualizer(self.ast_canvas)
+
+        # Status Bar
+        self.status_bar = ctk.CTkFrame(self, height=25, corner_radius=0, fg_color="#1e293b")
+        self.status_bar.pack(side=tk.BOTTOM, fill=tk.X)
+        self.status_lbl = ctk.CTkLabel(self.status_bar, text="Ready", font=("Segoe UI", 10), text_color="#94a3b8")
+        self.status_lbl.pack(side=tk.LEFT, padx=20)
+        
+        # Default code
         self.editor.insert("1.0", "score kickoff:\n    shout \"Hello GoalLang!\"\n    score x = 10\n    score y = 20\n    score result = x + y\n    shout \"The result is: \" + result")
 
+    def setup_treeview(self, parent, columns, attr_name):
+        style = ttk.Style()
+        style.theme_use("clam")
+        style.configure("Treeview", background="#1e293b", foreground="white", fieldbackground="#1e293b", borderwidth=0, font=("Segoe UI", 10))
+        style.configure("Treeview.Heading", background="#334155", foreground="white", font=("Segoe UI", 10, "bold"), borderwidth=0)
+        style.map("Treeview", background=[('selected', '#3b82f6')])
+        
+        tree = ttk.Treeview(parent, columns=columns, show="headings")
+        for i, col in enumerate(columns):
+            tree.heading(f"#{i+1}", text=col)
+            tree.column(f"#{i+1}", width=100, anchor="center")
+        tree.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        setattr(self, attr_name, tree)
+
     def setup_syntax_highlighting(self):
-        self.editor.tag_configure("KEYWORD", foreground="#c586c0")
-        self.editor.tag_configure("CONTROL", foreground="#569cd6")
-        self.editor.tag_configure("ERROR_LINE", background="#4b1d1d")
+        self.editor.tag_configure("KEYWORD", foreground="#c084fc") # Purple 400
+        self.editor.tag_configure("CONTROL", foreground="#60a5fa") # Blue 400
+        self.editor.tag_configure("STRING", foreground="#fbbf24")  # Amber 400
+        self.editor.tag_configure("COMMENT", foreground="#6b7280") # Gray 500
+        self.editor.tag_configure("ERROR_LINE", background="#451a1a")
 
     def highlight_syntax(self):
         content = self.editor.get("1.0", tk.END)
-        for tag in ["KEYWORD", "CONTROL"]: self.editor.tag_remove(tag, "1.0", tk.END)
-        # Added new keywords to highlighter
-        kw_p = r'\b(shout|receive|import|assist|player|goal|score|distance|flag)\b'
-        ct_p = r'\b(kickoff|referee|offside|training|stadium|match)\b'
-        for p, t in [(kw_p, "KEYWORD"), (ct_p, "CONTROL")]:
-            for m in re.finditer(p, content): self.editor.tag_add(t, f"1.0 + {m.start()} chars", f"1.0 + {m.end()} chars")
+        for tag in ["KEYWORD", "CONTROL", "STRING", "COMMENT"]: self.editor.tag_remove(tag, "1.0", tk.END)
+        
+        patterns = [
+            (r'\b(shout|receive|import|assist|player|goal|score|distance|flag)\b', "KEYWORD"),
+            (r'\b(kickoff|referee|offside|training|stadium|match)\b', "CONTROL"),
+            (r'"[^"\n]*"', "STRING"),
+            (r'#.*', "COMMENT")
+        ]
+        
+        for p, t in patterns:
+            for m in re.finditer(p, content):
+                start = f"1.0 + {m.start()} chars"
+                end = f"1.0 + {m.end()} chars"
+                self.editor.tag_add(t, start, end)
 
     def handle_auto_indent(self, event):
         line = self.editor.get("insert linestart", "insert lineend")
@@ -172,36 +284,55 @@ class GoalIDE:
         self.editor.insert("insert", "\n" + " " * indent)
         if line.strip().endswith(":"): self.editor.insert("insert", "    ")
         return "break"
+
     def clear_error_highlight(self, event=None): self.editor.tag_remove("ERROR_LINE", "1.0", tk.END)
     def on_content_change(self, event=None): self.line_nums.redraw(); self.highlight_syntax()
+    
     def log(self, msg, mode="INFO"):
-        c = {"INFO": "#00d1ff", "SUCCESS": "#28a745", "ERROR": "#ff3333", "OUTPUT": "#ffffff"}
-        self.console.insert(tk.END, f"[{datetime.now().strftime('%H:%M:%S')}] ", "#666666")
+        c = {"INFO": "#3b82f6", "SUCCESS": "#10b981", "ERROR": "#f43f5e", "OUTPUT": "#ffffff"}
+        self.console.insert(tk.END, f"[{datetime.now().strftime('%H:%M:%S')}] ", "#475569")
         self.console.insert(tk.END, msg + "\n", mode)
-        self.console.tag_config(mode, foreground=c.get(mode, "white")); self.console.see(tk.END)
+        self.console.tag_config(mode, foreground=c.get(mode, "white"))
+        self.console.tag_config("#475569", foreground="#475569")
+        self.console.see(tk.END)
 
     def run_code(self):
         self.clear_error_highlight()
         code = self.editor.get("1.0", tk.END).strip()
         if not code: return
         self.console.delete("1.0", tk.END)
+        self.status_lbl.configure(text="Compiling...", text_color="#fbbf24")
+        self.update_idletasks()
+        
         try:
             lexer = Lexer(code); tokens = lexer.scan()
             for i in self.token_tree.get_children(): self.token_tree.delete(i)
             for t in tokens: self.token_tree.insert("", tk.END, values=(t['type'], t['value'], t['line']))
+            
             parser = Parser(tokens); ast = parser.parse(); self.visualizer.draw(ast)
+            
             analyzer = SemanticAnalyzer(); analyzer.visit(ast)
             for i in self.sym_tree.get_children(): self.sym_tree.delete(i)
-            for s in analyzer.symbol_table.all_symbols: self.sym_tree.insert("", tk.END, values=(s['name'], s['type'], s['scope_depth'], s['line']))
+            for s in analyzer.symbol_table.all_symbols: 
+                self.sym_tree.insert("", tk.END, values=(s['name'], s['type'], s['scope_depth'], s['line']))
+            
             generator = CodeGenerator(); py_code = generator.generate(ast)
             self.py_view.config(state="normal"); self.py_view.delete("1.0", tk.END); self.py_view.insert("1.0", py_code); self.py_view.config(state="disabled")
-            self.log("Compile Successful!", "SUCCESS"); exec_out = io.StringIO(); sys.stdout = exec_out
-            exec(py_code, {}); sys.stdout = sys.__stdout__; self.log(exec_out.getvalue(), "OUTPUT")
+            
+            self.log("Compile Successful!", "SUCCESS")
+            self.status_lbl.configure(text="Success", text_color="#10b981")
+            
+            exec_out = io.StringIO(); sys.stdout = exec_out
+            exec(py_code, {}); sys.stdout = sys.__stdout__
+            self.log(exec_out.getvalue(), "OUTPUT")
         except Exception as e:
             msg = str(e); self.log(msg, "ERROR")
+            self.status_lbl.configure(text="Error", text_color="#f43f5e")
             match = re.search(r"line (\d+)", msg)
             if match:
-                line = match.group(1); self.editor.tag_add("ERROR_LINE", f"{line}.0", f"{line}.end"); self.editor.see(f"{line}.0")
+                line = match.group(1)
+                self.editor.tag_add("ERROR_LINE", f"{line}.0", f"{line}.end")
+                self.editor.see(f"{line}.0")
 
     def export_python(self):
         code = self.py_view.get("1.0", tk.END).strip()
@@ -210,16 +341,19 @@ class GoalIDE:
         if path:
             with open(path, "w") as f: f.write(code)
             messagebox.showinfo("Success", f"Exported to {path}")
+
     def new_file(self): self.editor.delete("1.0", tk.END)
     def open_file(self):
         path = filedialog.askopenfilename(filetypes=[("GoalLang Files", "*.goal"), ("All Files", "*.*")])
         if path:
             with open(path, "r") as f: self.editor.delete("1.0", tk.END); self.editor.insert("1.0", f.read())
             self.on_content_change()
+
     def save_file(self):
         path = filedialog.asksaveasfilename(filetypes=[("GoalLang Files", "*.goal")], defaultextension=".goal")
         if path:
             with open(path, "w") as f: f.write(self.editor.get("1.0", tk.END))
 
 if __name__ == "__main__":
-    root = tk.Tk(); app = GoalIDE(root); root.mainloop()
+    app = GoalIDE()
+    app.mainloop()
