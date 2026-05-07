@@ -47,17 +47,10 @@ class Parser:
             body = self._block()
             return StadiumNode(name, body)
 
-        # Handle Function Definition: score assist [name](params):
-        if tok['value'] == 'score' and self.peek(1)['value'] == 'assist':
+        # Handle Function Definition: score [assist] [name](params):
+        if tok['value'] == 'score' and self.peek(1)['type'] == 'ID' and self.peek(2)['value'] == '(':
             self.advance() # score
-            self.advance() # assist
-            
-            # If next is '(', the function name is 'assist' (as seen in some slides)
-            if self.peek()['value'] == '(':
-                name = "assist"
-            else:
-                name = self.match(expected_type='ID')['value']
-                
+            name = self.match(expected_type='ID')['value']
             self.match('(')
             params = []
             if self.peek()['value'] != ')':
@@ -140,32 +133,12 @@ class Parser:
         return None
 
     def _block(self):
-        # In this simple implementation, we assume blocks are followed by statements
-        # A more robust one would handle INDENT/DEDENT properly
-        # For now, let's assume all statements in a block are consumed until a keyword that ends a block or EOF
-        # Since we are using keywords like kickoff/referee, we can collect statements.
-        # But wait, GoalLang uses indentation. Our Lexer doesn't emit INDENT/DEDENT currently.
-        # Let's fix that or use a simple lookahead.
-        # Actually, let's assume a block is a list of statements.
+        self.match(expected_type='INDENT')
         body = []
-        # This is a bit tricky without INDENT tokens. 
-        # I'll implement a simple heuristic: consume until we see a keyword that isn't allowed in a block or a new block starter.
-        # BETTER: Let's assume for now that if the next line has more spaces, it's a block.
-        # But we don't have spaces in lexer. 
-        # I will assume the next 1 statement or a specific pattern.
-        # TO BE PRO: I should have added INDENT/DEDENT in Lexer. 
-        # I'll do a quick fix to consume at least one statement and more if they look like they belong.
-        
-        # Simple fix: collect statements as long as they aren't top-level keywords
-        # Heuristic: consume until we see a top-level keyword or end of scope
-        stop_keywords = ['kickoff', 'stadium', 'offside']
-        while self.peek()['value'] not in stop_keywords and self.peek()['type'] != 'EOF':
-             # Also stop if we see score assist (another function) or score kickoff
-             if self.peek()['value'] == 'score' and self.peek(1)['value'] in ['assist', 'kickoff']:
-                 break
-             stmt = self.statement()
-             if stmt: body.append(stmt)
-             else: break
+        while self.peek()['type'] != 'DEDENT' and self.peek()['type'] != 'EOF':
+            stmt = self.statement()
+            if stmt: body.append(stmt)
+        self.match(expected_type='DEDENT')
         return body
 
     def expression(self):

@@ -67,13 +67,14 @@ def goal_receive():
         self.indent_level -= 1
 
     def visit_Kickoff(self, node):
-        self.result.append('\nif __name__ == "__main__":')
+        self.result.append('\ndef main():')
         self.indent_level += 1
         if not node.body:
             self.result.append(f"{self._indent()}pass")
         else:
             for stmt in node.body: self.visit(stmt)
         self.indent_level -= 1
+        self.result.append('\nif __name__ == "__main__":\n    main()')
 
     def visit_Shout(self, node):
         expr_code = self.visit(node.expr)

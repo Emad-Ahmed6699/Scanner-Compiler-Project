@@ -43,7 +43,7 @@ class SymbolTable:
     def check_function(self, name, arg_count, line=0):
         if name not in self.functions:
             # Built-in functions check (optional)
-            if name in ['shout', 'receive']: return
+            if name in ['shout', 'receive', 'range']: return
             raise Exception(f"Semantic Error (line {line}): Function '{name}' is not defined")
         
         expected = self.functions[name]
@@ -100,8 +100,11 @@ class SemanticAnalyzer:
 
     def visit_Kickoff(self, node):
         self.symbol_table.push_scope()
+        old_in_func = self.in_function
+        self.in_function = True # Allow 'goal' in kickoff
         for stmt in node.body:
             self.visit(stmt)
+        self.in_function = old_in_func
         self.symbol_table.pop_scope()
 
     def visit_Shout(self, node):
