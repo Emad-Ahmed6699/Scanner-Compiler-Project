@@ -1,0 +1,15 @@
+# Simple GoalLang Test
+score kickoff:
+    shout "Welcome to GoalLang!"
+    
+    score goals = 5
+    shout "Goals scored: " + goals
+    
+    score bonus = 2
+    score total = goals + bonus
+    shout "Total Score with Bonus: " + total
+    
+    referee total > 5:
+        shout "You are a Pro Player!"
+    offside:
+        shout "Keep training."
