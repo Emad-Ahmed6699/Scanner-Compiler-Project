@@ -1,6 +1,6 @@
-# ⚽ GoalLang Scanner & Compiler Project
+# ⚽ GoalLang-IDE
 
-A complete, production-ready compiler for **GoalLang**, a sports-themed programming language that makes coding fun! This project implements a full compiler stack with a modern GUI IDE, transforming GoalLang code into executable Python.
+A complete, production-ready **Compiler IDE** for **GoalLang**, a sports-themed programming language that makes coding fun! This project implements a full compiler stack with a modern GUI IDE, transforming GoalLang code into executable Python.
 
 ---
 
@@ -330,8 +330,8 @@ For issues or questions:
 
 ```bash
 # Clone and run
-git clone https://github.com/Emad-Ahmed6699/Scanner-Compiler-Project.git
-cd Scanner-Compiler-Project
+git clone https://github.com/Emad-Ahmed6699/GoalLang-IDE.git
+cd GoalLang-IDE
 python ide.py
 ```
 
