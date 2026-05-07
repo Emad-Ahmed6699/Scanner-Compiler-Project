@@ -182,13 +182,18 @@ class GoalIDE(ctk.CTk):
                                   border_width=1, border_color="#334155")
         self.tabs.pack(fill=tk.BOTH, expand=True)
         
-        tab_list = ["💻 TERMINAL", "🐍 PYTHON", "🔍 TOKENS", "📊 SYMBOLS", "🌳 PARSER TREE"]
+        tab_list = ["💻 TERMINAL", "📝 OUTPUT", "🐍 PYTHON", "🔍 TOKENS", "📊 SYMBOLS", "🌳 PARSER TREE"]
         for t in tab_list: self.tabs.add(t)
-        
+
         # Terminal Tab
         self.console = tk.Text(self.tabs.tab("💻 TERMINAL"), bg="#020617", fg="#ffffff", font=("Consolas", 11), 
                               borderwidth=0, padx=15, pady=15)
         self.console.pack(fill=tk.BOTH, expand=True)
+
+        # Output Tab
+        self.output_view = tk.Text(self.tabs.tab("📝 OUTPUT"), bg="#020617", fg="#10b981", font=("Consolas", 12, "bold"), 
+                                  borderwidth=0, padx=15, pady=15)
+        self.output_view.pack(fill=tk.BOTH, expand=True)
         
         # Python Tab
         self.py_view = tk.Text(self.tabs.tab("🐍 PYTHON"), bg="#020617", fg="#80cbc4", font=("Consolas", 11), 
@@ -322,9 +327,21 @@ class GoalIDE(ctk.CTk):
             self.log("Compile Successful!", "SUCCESS")
             self.status_lbl.configure(text="Success", text_color="#10b981")
             
+            # Switch to Output Tab
+            self.tabs.set("📝 OUTPUT")
+            self.output_view.delete("1.0", tk.END)
+            
             exec_out = io.StringIO(); sys.stdout = exec_out
-            exec(py_code, {}); sys.stdout = sys.__stdout__
-            self.log(exec_out.getvalue(), "OUTPUT")
+            try:
+                exec(py_code, {"__name__": "__main__"})
+                sys.stdout = sys.__stdout__
+                output_val = exec_out.getvalue()
+                self.output_view.insert(tk.END, output_val if output_val else "Code executed with no output.")
+            except Exception as e:
+                sys.stdout = sys.__stdout__
+                self.output_view.insert(tk.END, f"Runtime Error:\n{str(e)}", "ERROR")
+                self.output_view.tag_config("ERROR", foreground="#f43f5e")
+                self.log(f"Runtime Error: {str(e)}", "ERROR")
         except Exception as e:
             msg = str(e); self.log(msg, "ERROR")
             self.status_lbl.configure(text="Error", text_color="#f43f5e")

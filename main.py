@@ -40,7 +40,7 @@ def compile_goal(source_file):
         
         # Suggest running the code
         print("\n--- Execution Result ---")
-        exec(python_code)
+        exec(python_code, {"__name__": "__main__"})
         
     except Exception as e:
         print(f"\nCompilation Error: {str(e)}")
