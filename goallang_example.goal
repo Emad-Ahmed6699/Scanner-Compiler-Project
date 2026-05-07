@@ -6,7 +6,7 @@
 score kickoff:
     player name
     score goals
-    
+
     shout "Enter player name: "
     receive name
     
@@ -14,4 +14,3 @@ score kickoff:
     receive goals
     
     shout name + " scored " + goals + " goals!"
-    goal 0
