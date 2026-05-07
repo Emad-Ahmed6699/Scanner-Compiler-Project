@@ -90,7 +90,7 @@ class LineNumbers(tk.Canvas):
 class GoalIDE:
     def __init__(self, root):
         self.root = root
-        self.root.title("⚽ GoalLang IDE - Pro Compiler")
+        self.root.title("⚽ GoalLang-IDE - Pro Compiler")
         self.root.geometry("1400x900")
         self.root.configure(bg="#1e1e1e")
         self.setup_styles()
