@@ -7,7 +7,7 @@ class Lexer:
         self.line = 1
         self.indent_stack = [0]
         
-        # Updated Regex Rules
+        # Define rules
         self.rules = [
             ('COMMENT',  r'#[^\n]*'),
             ('STRING',   r'"[^"]*"'),

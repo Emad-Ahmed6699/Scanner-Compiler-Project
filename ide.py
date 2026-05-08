@@ -5,6 +5,7 @@ import sys
 import io
 import threading
 import time
+import queue
 from datetime import datetime
 import re
 
@@ -115,6 +116,11 @@ class GoalIDE(ctk.CTk):
         self.editor.bind("<<Change>>", self.on_content_change)
         self.editor.bind("<Return>", self.handle_auto_indent)
         self.editor.bind("<Key>", self.clear_error_highlight)
+        
+        # Terminal Interaction State
+        self.input_queue = queue.Queue()
+        self.is_running = False
+        self.console.bind("<Return>", self.handle_terminal_input)
 
     def setup_menubar(self):
         menubar = tk.Menu(self, bg="#1e293b", fg="white", activebackground="#3b82f6", borderwidth=0)
@@ -264,7 +270,8 @@ class GoalIDE(ctk.CTk):
         self.editor.tag_configure("CONTROL", foreground="#60a5fa") # Blue 400
         self.editor.tag_configure("STRING", foreground="#fbbf24")  # Amber 400
         self.editor.tag_configure("COMMENT", foreground="#6b7280") # Gray 500
-        self.editor.tag_configure("ERROR_LINE", background="#451a1a")
+        self.editor.tag_configure("ERROR_LINE", background="#7f1d1d", foreground="white") # Dark Red background, white text
+        self.editor.tag_raise("ERROR_LINE")
 
     def highlight_syntax(self):
         content = self.editor.get("1.0", tk.END)
@@ -295,17 +302,73 @@ class GoalIDE(ctk.CTk):
     
     def log(self, msg, mode="INFO"):
         c = {"INFO": "#3b82f6", "SUCCESS": "#10b981", "ERROR": "#f43f5e", "OUTPUT": "#ffffff"}
-        self.console.insert(tk.END, f"[{datetime.now().strftime('%H:%M:%S')}] ", "#475569")
-        self.console.insert(tk.END, msg + "\n", mode)
+        self.append_to_console(f"[{datetime.now().strftime('%H:%M:%S')}] ", "#475569", is_system=True)
+        self.append_to_console(msg + "\n", mode, is_system=True)
         self.console.tag_config(mode, foreground=c.get(mode, "white"))
         self.console.tag_config("#475569", foreground="#475569")
+
+    def append_to_console(self, text, tag=None, is_system=False):
+        def _append():
+            self.console.configure(state="normal")
+            self.console.insert(tk.END, text, tag)
+            self.console.see(tk.END)
+            
+            # Smart filtering for Output tab:
+            # We only want actual program output (shout results)
+            # Skip system logs and input prompts
+            is_prompt = any(text.strip().endswith(c) for c in [":", "?", ">"]) or "Enter " in text
+            
+            if not is_system and not is_prompt:
+                self.output_view.configure(state="normal")
+                self.output_view.insert(tk.END, text, tag)
+                self.output_view.see(tk.END)
+            
+            if not self.is_running:
+                 self.console.configure(state="disabled")
+                 self.output_view.configure(state="disabled")
+        self.after(0, _append)
+
+    def stop_execution(self):
+        if self.is_running:
+            self.is_running = False
+            self.input_queue.put(None) # Unblock queue.get()
+            self.status_lbl.configure(text="Stopped", text_color="#f43f5e")
+            self.log("Previous execution stopped.", "ERROR")
+
+    def handle_terminal_input(self, event):
+        if not self.is_running: return "break"
+        
+        line = self.console.get("insert linestart", "insert lineend")
+        self.input_queue.put(line + "\n")
+        
+        # Move cursor to end and add newline
+        self.console.insert(tk.END, "\n")
         self.console.see(tk.END)
+        return "break"
+
+    def set_waiting_input(self, waiting):
+        if waiting:
+            self.after(0, lambda: self.status_lbl.configure(text="Waiting for input...", text_color="#fbbf24"))
+            self.after(0, lambda: self.console.configure(state="normal"))
+            self.after(0, lambda: self.console.focus_set())
+        else:
+            self.after(0, lambda: self.status_lbl.configure(text="Running...", text_color="#3b82f6"))
 
     def run_code(self):
+        if self.is_running:
+            self.stop_execution()
+            self.after(100, self.run_code) # Wait a bit and retry
+            return
+
         self.clear_error_highlight()
         code = self.editor.get("1.0", tk.END).strip()
         if not code: return
+        
+        self.console.configure(state="normal")
         self.console.delete("1.0", tk.END)
+        self.output_view.configure(state="normal")
+        self.output_view.delete("1.0", tk.END)
+        
         self.status_lbl.configure(text="Compiling...", text_color="#fbbf24")
         self.update_idletasks()
         
@@ -325,23 +388,14 @@ class GoalIDE(ctk.CTk):
             self.py_view.config(state="normal"); self.py_view.delete("1.0", tk.END); self.py_view.insert("1.0", py_code); self.py_view.config(state="disabled")
             
             self.log("Compile Successful!", "SUCCESS")
-            self.status_lbl.configure(text="Success", text_color="#10b981")
             
-            # Switch to Output Tab
-            self.tabs.set("📝 OUTPUT")
-            self.output_view.delete("1.0", tk.END)
+            # Switch to Terminal Tab for execution
+            self.tabs.set("💻 TERMINAL")
+            self.is_running = True
             
-            exec_out = io.StringIO(); sys.stdout = exec_out
-            try:
-                exec(py_code, {"__name__": "__main__"})
-                sys.stdout = sys.__stdout__
-                output_val = exec_out.getvalue()
-                self.output_view.insert(tk.END, output_val if output_val else "Code executed with no output.")
-            except Exception as e:
-                sys.stdout = sys.__stdout__
-                self.output_view.insert(tk.END, f"Runtime Error:\n{str(e)}", "ERROR")
-                self.output_view.tag_config("ERROR", foreground="#f43f5e")
-                self.log(f"Runtime Error: {str(e)}", "ERROR")
+            # Start execution thread
+            threading.Thread(target=self.execute_thread, args=(py_code,), daemon=True).start()
+            
         except Exception as e:
             msg = str(e); self.log(msg, "ERROR")
             self.status_lbl.configure(text="Error", text_color="#f43f5e")
@@ -349,7 +403,55 @@ class GoalIDE(ctk.CTk):
             if match:
                 line = match.group(1)
                 self.editor.tag_add("ERROR_LINE", f"{line}.0", f"{line}.end")
+                self.editor.tag_raise("ERROR_LINE")
+                self.editor.mark_set("insert", f"{line}.0")
                 self.editor.see(f"{line}.0")
+                self.editor.focus_set()
+
+    def execute_thread(self, py_code):
+        class TerminalIO:
+            def __init__(self, app): self.app = app
+            def write(self, s):
+                if not self.app.is_running: raise SystemExit()
+                self.app.append_to_console(s)
+            def flush(self): pass
+            def readline(self):
+                self.app.set_waiting_input(True)
+                val = self.app.input_queue.get()
+                if not self.app.is_running: raise SystemExit()
+                self.app.set_waiting_input(False)
+                return val
+
+        old_stdout, old_stdin = sys.stdout, sys.stdin
+        sys.stdout = sys.stderr = TerminalIO(self)
+        sys.stdin = TerminalIO(self)
+        
+        try:
+            # Use a wrapper for input that strips the trailing newline, matching standard input() behavior
+            exec(py_code, {"__name__": "__main__", "input": lambda prompt="": sys.stdin.readline().rstrip('\n')})
+            if self.is_running:
+                self.after(0, lambda: self.status_lbl.configure(text="Ready", text_color="#94a3b8"))
+                self.log("Execution Finished", "SUCCESS")
+        except SystemExit:
+            pass # Stopped by user
+        except Exception as e:
+            if self.is_running:
+                self.append_to_console(f"\nRuntime Error:\n{str(e)}\n", "ERROR", is_system=True)
+                self.after(0, lambda: self.status_lbl.configure(text="Runtime Error", text_color="#f43f5e"))
+                match = re.search(r"line (\d+)", str(e))
+                if match:
+                    line = match.group(1)
+                    self.after(0, lambda: self.editor.tag_add("ERROR_LINE", f"{line}.0", f"{line}.end"))
+                    self.after(0, lambda: self.editor.tag_raise("ERROR_LINE"))
+                    self.after(0, lambda: self.editor.mark_set("insert", f"{line}.0"))
+                    self.after(0, lambda: self.editor.see(f"{line}.0"))
+        finally:
+            sys.stdout, sys.stdin = old_stdout, old_stdin
+            self.is_running = False
+            self.after(0, lambda: self.console.configure(state="disabled"))
+            self.after(0, lambda: self.output_view.configure(state="disabled"))
+            # Automatically switch back to OUTPUT tab when finished
+            self.after(200, lambda: self.tabs.set("📝 OUTPUT"))
 
     def export_python(self):
         code = self.py_view.get("1.0", tk.END).strip()

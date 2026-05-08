@@ -84,14 +84,14 @@ class SemanticAnalyzer:
 
     def visit_FunctionDef(self, node):
         # Register the function globally before entering its scope
-        self.symbol_table.register_function(node.name, len(node.params))
+        self.symbol_table.register_function(node.name, len(node.params), node.line)
         self.symbol_table.push_scope()
         
         old_in_function = self.in_function
         self.in_function = True # Now inside a function
         
         for p in node.params:
-            self.symbol_table.declare(p, "param")
+            self.symbol_table.declare(p, "param", node.line)
         for stmt in node.body:
             self.visit(stmt)
             
@@ -112,19 +112,19 @@ class SemanticAnalyzer:
 
     def visit_Receive(self, node):
         try:
-            self.symbol_table.lookup(node.name)
+            self.symbol_table.lookup(node.name, node.line)
         except:
-            self.symbol_table.declare(node.name, "var")
+            self.symbol_table.declare(node.name, "var", node.line)
 
     def visit_Assign(self, node):
         self.visit(node.value)
         try:
-            self.symbol_table.lookup(node.name)
+            self.symbol_table.lookup(node.name, node.line)
         except:
-            self.symbol_table.declare(node.name, "var")
+            self.symbol_table.declare(node.name, "var", node.line)
 
     def visit_VarDecl(self, node):
-        self.symbol_table.declare(node.name, node.dtype)
+        self.symbol_table.declare(node.name, node.dtype, node.line)
         if node.value:
             self.visit(node.value)
 
@@ -146,7 +146,7 @@ class SemanticAnalyzer:
 
     def visit_For(self, node):
         self.symbol_table.push_scope()
-        self.symbol_table.declare(node.var, "var")
+        self.symbol_table.declare(node.var, "var", node.line)
         self.visit(node.iterable)
         for stmt in node.body: self.visit(stmt)
         self.symbol_table.pop_scope()
@@ -154,7 +154,7 @@ class SemanticAnalyzer:
     def visit_FunctionCall(self, node):
         for arg in node.args:
             self.visit(arg)
-        self.symbol_table.check_function(node.name, len(node.args))
+        self.symbol_table.check_function(node.name, len(node.args), node.line)
 
     def visit_UnaryOp(self, node):
         self.visit(node.expr)
@@ -164,13 +164,13 @@ class SemanticAnalyzer:
         self.visit(node.right)
 
     def visit_Variable(self, node):
-        self.symbol_table.lookup(node.name)
+        self.symbol_table.lookup(node.name, node.line)
 
     def visit_Literal(self, node):
         pass
 
     def visit_Return(self, node):
         if not self.in_function:
-            raise Exception("Semantic Error: 'goal' (return) statement is only allowed inside an 'assist' (function)")
+            raise Exception(f"Semantic Error (line {node.line}): 'goal' (return) statement is only allowed inside an 'assist' (function)")
         if node.value:
             self.visit(node.value)
